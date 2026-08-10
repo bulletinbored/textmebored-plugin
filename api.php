@@ -16,7 +16,16 @@ if (!isset($_SESSION['user_id'])) {
 
 $method = $_SERVER['REQUEST_METHOD'];
 
-$pdo = new PDO('sqlite:' . ($config['db_path'] ?? __DIR__ . '/../../data/database.sqlite'));
+// Connect using the configured driver (not hard-coded SQLite).
+if (($config['db_driver'] ?? 'sqlite') === 'mysql') {
+    $pdo = new PDO(
+        "mysql:host={$config['db_host']};dbname={$config['db_name']};charset=utf8mb4",
+        $config['db_user'],
+        $config['db_pass']
+    );
+} else {
+    $pdo = new PDO('sqlite:' . ($config['db_path'] ?? __DIR__ . '/../../data/database.sqlite'));
+}
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 function textmebored_validate_csrf_token($token) {
@@ -36,13 +45,13 @@ if ($method === 'GET') {
             SELECT
                 CASE WHEN sender_id = :uid THEN recipient_id ELSE sender_id END as other_user_id,
                 MAX(created_at) as last_message_at,
-                MAX(read) as last_read,
+                MAX(is_read) as last_read,
                 (SELECT content FROM private_messages pm2
                  WHERE ((pm2.sender_id = :uid AND pm2.recipient_id = CASE WHEN pm.sender_id = :uid THEN pm.recipient_id ELSE pm.sender_id END)
                      OR (pm2.recipient_id = :uid AND pm2.sender_id = CASE WHEN pm.sender_id = :uid THEN pm.recipient_id ELSE pm.sender_id END))
                  ORDER BY pm2.created_at DESC LIMIT 1) as last_message,
                 (SELECT username FROM users u WHERE u.id = CASE WHEN pm.sender_id = :uid THEN pm.recipient_id ELSE pm.sender_id END) as other_username,
-                SUM(CASE WHEN recipient_id = :uid AND read = 0 THEN 1 ELSE 0 END) as unread_count
+                SUM(CASE WHEN recipient_id = :uid AND is_read = 0 THEN 1 ELSE 0 END) as unread_count
             FROM private_messages pm
             WHERE sender_id = :uid OR recipient_id = :uid
             GROUP BY other_user_id
@@ -67,7 +76,7 @@ if ($method === 'GET') {
         }
 
         $stmt = $pdo->prepare("
-            SELECT id, sender_id, recipient_id, content, read, created_at
+            SELECT id, sender_id, recipient_id, content, is_read, created_at
             FROM private_messages
             WHERE (sender_id = :me AND recipient_id = :other) OR (sender_id = :other AND recipient_id = :me)
             ORDER BY created_at ASC
@@ -78,7 +87,7 @@ if ($method === 'GET') {
         ]);
         $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $pdo->prepare("UPDATE private_messages SET read = 1 WHERE recipient_id = :me AND sender_id = :other AND read = 0")
+        $pdo->prepare("UPDATE private_messages SET is_read = 1 WHERE recipient_id = :me AND sender_id = :other AND is_read = 0")
             ->execute(['me' => $_SESSION['user_id'], 'other' => $otherUserId]);
 
         echo json_encode([
@@ -89,7 +98,7 @@ if ($method === 'GET') {
     }
 
     if ($action === 'unread_count') {
-        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM private_messages WHERE recipient_id = ? AND read = 0");
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM private_messages WHERE recipient_id = ? AND is_read = 0");
         $countStmt->execute([$_SESSION['user_id']]);
         $unreadCount = (int)$countStmt->fetchColumn();
 
