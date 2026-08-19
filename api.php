@@ -23,6 +23,17 @@ if (!function_exists('t')) {
 
 header('Content-Type: application/json');
 
+// Always respond with JSON, even on fatal errors, so the frontend never
+// receives an HTML error page that would break JSON.parse in production.
+set_exception_handler(function ($e) {
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json');
+    }
+    echo json_encode(['error' => 'Internal error: ' . $e->getMessage()]);
+    exit;
+});
+
 $baseUrl = rtrim(!empty($config['base_url']) ? $config['base_url'] : preg_replace('#/plugins/[^/]+/[^/]+$#', '', $_SERVER['SCRIPT_NAME'] ?? ''), '/');
 $pluginUrl = $baseUrl . '/plugins/textmebored';
 $apiUrl = $pluginUrl . '/api.php';
@@ -47,40 +58,10 @@ if (($config['db_driver'] ?? 'sqlite') === 'mysql') {
 }
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-// Ensure the private_messages table exists. This endpoint is standalone and
-// does not run textmebored_init(), which is where the table is normally
-// created. In MySQL production the table may not exist yet, so create it here
-// to avoid "table doesn't exist" errors on first use.
-$pmDriver = $config['db_driver'] ?? 'sqlite';
-if ($pmDriver === 'mysql') {
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS private_messages (
-            id INT PRIMARY KEY AUTO_INCREMENT,
-            sender_id INT NOT NULL,
-            recipient_id INT NOT NULL,
-            subject TEXT,
-            content TEXT NOT NULL,
-            is_read INT DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ");
-    try { $pdo->exec("CREATE INDEX idx_pm_recipient ON private_messages(recipient_id, is_read, created_at)"); } catch (Throwable $e) {}
-    try { $pdo->exec("CREATE INDEX idx_pm_sender ON private_messages(sender_id, created_at)"); } catch (Throwable $e) {}
-} else {
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS private_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sender_id INTEGER NOT NULL,
-            recipient_id INTEGER NOT NULL,
-            subject TEXT DEFAULT '',
-            content TEXT NOT NULL,
-            is_read INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ");
-    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_pm_recipient ON private_messages(recipient_id, is_read, created_at)");
-    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_pm_sender ON private_messages(sender_id, created_at)");
-}
+// Ensure the private_messages table exists at runtime. This endpoint is
+// standalone and does not run textmebored_init(), and a migrated/production DB
+// may be missing the table, which would otherwise cause a 500.
+ensure_private_messages_table($pdo);
 
 function textmebored_validate_csrf_token($token) {
     return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
@@ -95,24 +76,44 @@ if ($method === 'GET') {
     $action = $pathAction ?: $_GET['action'] ?? 'conversations';
 
     if ($action === 'conversations') {
+        // Aggregate query kept strict-GROUP-BY safe (no subqueries in SELECT),
+        // then enrich each conversation with its last message and username in
+        // PHP. This avoids ONLY_FULL_GROUP_BY errors on MySQL 5.7+.
         $stmt = $pdo->prepare("
             SELECT
-                CASE WHEN sender_id = :uid THEN recipient_id ELSE sender_id END as other_user_id,
+                CASE WHEN sender_id = :uid1 THEN recipient_id ELSE sender_id END as other_user_id,
                 MAX(created_at) as last_message_at,
                 MAX(is_read) as last_read,
-                (SELECT content FROM private_messages pm2
-                 WHERE ((pm2.sender_id = :uid AND pm2.recipient_id = CASE WHEN pm.sender_id = :uid THEN pm.recipient_id ELSE pm.sender_id END)
-                     OR (pm2.recipient_id = :uid AND pm2.sender_id = CASE WHEN pm.sender_id = :uid THEN pm.recipient_id ELSE pm.sender_id END))
-                 ORDER BY pm2.created_at DESC LIMIT 1) as last_message,
-                (SELECT username FROM users u WHERE u.id = CASE WHEN pm.sender_id = :uid THEN pm.recipient_id ELSE pm.sender_id END) as other_username,
-                SUM(CASE WHEN recipient_id = :uid AND is_read = 0 THEN 1 ELSE 0 END) as unread_count
-            FROM private_messages pm
-            WHERE sender_id = :uid OR recipient_id = :uid
+                SUM(CASE WHEN recipient_id = :uid2 AND is_read = 0 THEN 1 ELSE 0 END) as unread_count
+            FROM private_messages
+            WHERE sender_id = :uid3 OR recipient_id = :uid4
             GROUP BY other_user_id
             ORDER BY last_message_at DESC
         ");
-        $stmt->execute(['uid' => $_SESSION['user_id']]);
-        $conversations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->execute([
+            'uid1' => $_SESSION['user_id'],
+            'uid2' => $_SESSION['user_id'],
+            'uid3' => $_SESSION['user_id'],
+            'uid4' => $_SESSION['user_id'],
+        ]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $conversations = [];
+        $msgStmt = $pdo->prepare("
+            SELECT content FROM private_messages
+            WHERE (sender_id = :uid1 AND recipient_id = :other) OR (recipient_id = :uid2 AND sender_id = :other)
+            ORDER BY created_at DESC LIMIT 1
+        ");
+        $userStmt = $pdo->prepare("SELECT username FROM users WHERE id = :id");
+
+        foreach ($rows as $row) {
+            $otherId = (int)$row['other_user_id'];
+            $msgStmt->execute(['uid1' => $_SESSION['user_id'], 'uid2' => $_SESSION['user_id'], 'other' => $otherId]);
+            $row['last_message'] = $msgStmt->fetchColumn();
+            $userStmt->execute(['id' => $otherId]);
+            $row['other_username'] = $userStmt->fetchColumn();
+            $conversations[] = $row;
+        }
 
         echo json_encode([
             'success' => true,
