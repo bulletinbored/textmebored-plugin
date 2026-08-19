@@ -101,14 +101,14 @@ if ($method === 'GET') {
         $conversations = [];
         $msgStmt = $pdo->prepare("
             SELECT content FROM private_messages
-            WHERE (sender_id = :uid1 AND recipient_id = :other) OR (recipient_id = :uid2 AND sender_id = :other)
+            WHERE (sender_id = :uid1 AND recipient_id = :other1) OR (recipient_id = :uid2 AND sender_id = :other2)
             ORDER BY created_at DESC LIMIT 1
         ");
         $userStmt = $pdo->prepare("SELECT username FROM users WHERE id = :id");
 
         foreach ($rows as $row) {
             $otherId = (int)$row['other_user_id'];
-            $msgStmt->execute(['uid1' => $_SESSION['user_id'], 'uid2' => $_SESSION['user_id'], 'other' => $otherId]);
+            $msgStmt->execute(['uid1' => $_SESSION['user_id'], 'uid2' => $_SESSION['user_id'], 'other1' => $otherId, 'other2' => $otherId]);
             $row['last_message'] = $msgStmt->fetchColumn();
             $userStmt->execute(['id' => $otherId]);
             $row['other_username'] = $userStmt->fetchColumn();
@@ -133,17 +133,19 @@ if ($method === 'GET') {
         $stmt = $pdo->prepare("
             SELECT id, sender_id, recipient_id, content, is_read, created_at
             FROM private_messages
-            WHERE (sender_id = :me AND recipient_id = :other) OR (sender_id = :other AND recipient_id = :me)
+            WHERE (sender_id = :me1 AND recipient_id = :other1) OR (sender_id = :other2 AND recipient_id = :me2)
             ORDER BY created_at ASC
         ");
         $stmt->execute([
-            'me' => $_SESSION['user_id'],
-            'other' => $otherUserId,
+            'me1' => $_SESSION['user_id'],
+            'me2' => $_SESSION['user_id'],
+            'other1' => $otherUserId,
+            'other2' => $otherUserId,
         ]);
         $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $pdo->prepare("UPDATE private_messages SET is_read = 1 WHERE recipient_id = :me AND sender_id = :other AND is_read = 0")
-            ->execute(['me' => $_SESSION['user_id'], 'other' => $otherUserId]);
+        $pdo->prepare("UPDATE private_messages SET is_read = 1 WHERE recipient_id = :me1 AND sender_id = :other1 AND is_read = 0")
+            ->execute(['me1' => $_SESSION['user_id'], 'other1' => $otherUserId]);
 
         echo json_encode([
             'success' => true,
