@@ -1,6 +1,25 @@
 <?php
 session_start();
 require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../src/helpers.php';
+
+// Minimal i18n bootstrap so t()/send_email() work in this standalone endpoint.
+$lang = $_SESSION['lang'] ?? $config['default_lang'] ?? 'en';
+$GLOBALS['i18n'] = ['core' => []];
+$coreLangFile = __DIR__ . '/../../lang/' . $lang . '.php';
+if (file_exists($coreLangFile)) {
+    $GLOBALS['i18n']['core'] = include $coreLangFile;
+}
+if (!function_exists('t')) {
+    function t($key, $params = [], $scope = 'core') {
+        $registry = $GLOBALS['i18n'] ?? [];
+        $text = $registry[$scope][$key] ?? $key;
+        foreach ($params as $k => $v) {
+            $text = str_replace('{' . $k . '}', $v, $text);
+        }
+        return $text;
+    }
+}
 
 header('Content-Type: application/json');
 
@@ -27,6 +46,41 @@ if (($config['db_driver'] ?? 'sqlite') === 'mysql') {
     $pdo = new PDO('sqlite:' . ($config['db_path'] ?? __DIR__ . '/../../data/database.sqlite'));
 }
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+// Ensure the private_messages table exists. This endpoint is standalone and
+// does not run textmebored_init(), which is where the table is normally
+// created. In MySQL production the table may not exist yet, so create it here
+// to avoid "table doesn't exist" errors on first use.
+$pmDriver = $config['db_driver'] ?? 'sqlite';
+if ($pmDriver === 'mysql') {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS private_messages (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            sender_id INT NOT NULL,
+            recipient_id INT NOT NULL,
+            subject TEXT,
+            content TEXT NOT NULL,
+            is_read INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+    try { $pdo->exec("CREATE INDEX idx_pm_recipient ON private_messages(recipient_id, is_read, created_at)"); } catch (Throwable $e) {}
+    try { $pdo->exec("CREATE INDEX idx_pm_sender ON private_messages(sender_id, created_at)"); } catch (Throwable $e) {}
+} else {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS private_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER NOT NULL,
+            recipient_id INTEGER NOT NULL,
+            subject TEXT DEFAULT '',
+            content TEXT NOT NULL,
+            is_read INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_pm_recipient ON private_messages(recipient_id, is_read, created_at)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_pm_sender ON private_messages(sender_id, created_at)");
+}
 
 function textmebored_validate_csrf_token($token) {
     return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
@@ -177,6 +231,24 @@ if ($method === 'POST') {
             VALUES (?, ?, '', ?)
         ");
         $stmt->execute([$_SESSION['user_id'], $recipientId, $content]);
+
+        // Notify the recipient by email (case 8).
+        $senderStmt = $pdo->prepare("SELECT username, email FROM users WHERE id = ?");
+        $senderStmt->execute([$_SESSION['user_id']]);
+        $sender = $senderStmt->fetch(PDO::FETCH_ASSOC);
+        $recipientStmt = $pdo->prepare("SELECT username, email FROM users WHERE id = ?");
+        $recipientStmt->execute([$recipientId]);
+        $recipient = $recipientStmt->fetch(PDO::FETCH_ASSOC);
+        if ($recipient && !empty($recipient['email'])) {
+            $subject = t('new_pm_subject', ['sender' => $sender['username'] ?? 'Someone']);
+            $body = t('new_pm_body', [
+                'username' => escape($recipient['username'] ?? ''),
+                'sender' => escape($sender['username'] ?? 'Someone'),
+                'message' => escape(mb_substr($content, 0, 500)),
+                'link' => url('messages', ['conversation' => $recipientId], true),
+            ]);
+            send_email($recipient['email'], $subject, $body);
+        }
 
         echo json_encode([
             'success' => true,

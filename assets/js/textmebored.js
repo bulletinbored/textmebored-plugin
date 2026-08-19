@@ -389,22 +389,31 @@ function newConversation() {
     }
 
     function createUI() {
-        var userMenu = document.querySelector('.navbar-nav:last-child');
-        if (!userMenu) return;
+        if (document.getElementById('textmebored-nav-anchor')) {
+            return;
+        }
+        // Reuse the existing Messages icon in the topbar (the one rendered by
+        // header.php before the user name) instead of injecting a duplicate
+        // envelope icon after the user menu.
+        toggle = document.querySelector('a[href*="messages"][title="Messages"]');
+        if (!toggle) {
+            var userMenu = document.querySelector('.navbar-nav:last-child');
+            if (!userMenu) return;
 
-        navItem = document.createElement('li');
-        navItem.className = 'nav-item textmebored-nav-item';
+            navItem = document.createElement('li');
+            navItem.className = 'nav-item textmebored-nav-item';
 
-        toggle = document.createElement('a');
-        toggle.className = 'nav-link';
-        toggle.href = window.textmebored.baseUrl + '/messages';
-        toggle.innerHTML = '<i class="fas fa-envelope me-1"></i><span class="badge bg-danger rounded-pill textmebored-unread-count" style="display:none;">0</span>';
-        toggle.addEventListener('click', function(e) {
-            if (dropdown && dropdown.style.display !== 'none') {
-                closeDropdown();
-                e.preventDefault();
-            }
-        });
+            toggle = document.createElement('a');
+            toggle.className = 'nav-link';
+            toggle.href = window.textmebored.baseUrl + '/messages';
+            toggle.innerHTML = '<i class="fas fa-envelope me-1"></i>';
+
+            navItem.appendChild(toggle);
+            userMenu.appendChild(navItem);
+        } else {
+            navItem = toggle.closest('li') || toggle.parentNode;
+        }
+        toggle.id = 'textmebored-nav-anchor';
 
         dropdown = document.createElement('ul');
         dropdown.className = 'dropdown-menu dropdown-menu-end textmebored-dropdown show';
@@ -414,11 +423,15 @@ function newConversation() {
         dropdown.style.display = 'none';
         dropdown.innerHTML = '<li class="dropdown-header"><i class="fas fa-envelope me-1"></i>Messages</li><li><hr class="dropdown-divider"></li><li class="textmebored-empty-msg text-center text-muted py-3">No messages yet</li>';
 
-        navItem.appendChild(toggle);
         navItem.appendChild(dropdown);
-        userMenu.appendChild(navItem);
 
         unreadBadge = toggle.querySelector('.textmebored-unread-count');
+        if (!unreadBadge) {
+            unreadBadge = document.createElement('span');
+            unreadBadge.className = 'badge bg-danger rounded-pill textmebored-unread-count';
+            unreadBadge.style.display = 'none';
+            toggle.appendChild(unreadBadge);
+        }
         bellItem = dropdown;
         emptyMsg = dropdown.querySelector('.textmebored-empty-msg');
 
@@ -453,13 +466,13 @@ function newConversation() {
     }
 
     function init() {
-        if (!document.getElementById('textmebored-nav-item')) {
+        if (!document.getElementById('textmebored-nav-anchor')) {
             createUI();
         } else {
             navItem = document.getElementById('textmebored-nav-item');
-            toggle = navItem.querySelector('.nav-link');
-            dropdown = navItem.querySelector('.textmebored-dropdown');
-            unreadBadge = navItem.querySelector('.textmebored-unread-count');
+            toggle = document.getElementById('textmebored-nav-anchor');
+            dropdown = toggle.parentNode.querySelector('.textmebored-dropdown');
+            unreadBadge = toggle.querySelector('.textmebored-unread-count');
             bellItem = dropdown;
             emptyMsg = dropdown.querySelector('.textmebored-empty-msg');
 
