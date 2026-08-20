@@ -63,8 +63,7 @@ function textmebored_init() {
     $head = '<link href="' . $cssUrl . '" rel="stylesheet">' . "\n";
     $head .= '<script>window.textmebored = window.textmebored || {};window.textmebored.apiUrl = ' . json_encode($apiUrl) . ';window.textmebored.baseUrl = ' . json_encode($baseUrl) . ';window.textmebored.csrfToken = ' . json_encode($csrfToken) . ';window.textmebored.currentUserId = ' . json_encode($_SESSION['user_id'] ?? 0) . ';</script>' . "\n";
 
-    $footer = '<script src="' . $jsUrl . '"></script>' . "\n";
-    $footer .= '<script>setTimeout(function(){window.textmebored = window.textmebored || {};window.textmebored.init && window.textmebored.init();}, 0);</script>' . "\n";
+    $footer = '<script src="' . $jsUrl . '" onload="window.textmebored=window.textmebored||{};window.textmebored.init&&window.textmebored.init()"></script>' . "\n";
 
     $pluginManager->addHook('frontend_before_render', function() use ($head) {
         echo $head;

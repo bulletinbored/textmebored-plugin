@@ -39,9 +39,9 @@
     }
 
     function closeOtherDropdowns() {
-        var otherDropdown = document.querySelector('.bellbored-dropdown');
-        if (otherDropdown && otherDropdown.style.display !== 'none') {
-            otherDropdown.style.display = 'none';
+        var otherDropdown = document.querySelector('.bellbored-panel');
+        if (otherDropdown && otherDropdown.getAttribute('data-open') === '1') {
+            otherDropdown.setAttribute('data-open', '0');
         }
     }
 
@@ -389,6 +389,15 @@ function newConversation() {
     }
 
     function createUI() {
+        if (window.textmebored.currentUserId === 0) {
+            return;
+        }
+        // On mobile the envelope is a plain link to the messages page (the
+        // numbered badge stays). Dropdowns are disabled there.
+        if (window.matchMedia && window.matchMedia('(max-width: 991.98px)').matches) {
+            return;
+        }
+
         if (document.getElementById('textmebored-nav-anchor')) {
             return;
         }

@@ -32,6 +32,11 @@
     overflow: hidden;
 }
 
+.textmebored-dropdown.dropdown-menu-end {
+    right: 16px;
+    left: auto;
+}
+
 .textmebored-dropdown .dropdown-header {
     background: #f8f9fa;
     padding: 10px 16px;
