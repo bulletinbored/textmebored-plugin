@@ -1,4 +1,15 @@
 <?php
+// Use the same app-owned session directory as the main app (bootstrap.php),
+// otherwise on shared hosting where the system default session path is not
+// writable the standalone API would start a fresh session every request and
+// fail CSRF validation, breaking messages/autocomplete silently.
+$sessionDir = __DIR__ . '/../../data/sessions';
+if (!is_dir($sessionDir)) {
+    @mkdir($sessionDir, 0755, true);
+}
+if (is_dir($sessionDir) && is_writable($sessionDir)) {
+    session_save_path($sessionDir);
+}
 session_start();
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../src/helpers.php';
