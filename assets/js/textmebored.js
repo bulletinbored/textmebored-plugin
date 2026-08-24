@@ -236,7 +236,7 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-function newConversation() {
+    function newConversation(prefillUsername) {
     var existing = document.getElementById('textmebored-compose-modal');
     if (existing) {
         existing.remove();
@@ -255,7 +255,16 @@ function newConversation() {
     modalHtml += '<form class="textmebored-compose-form">';
     modalHtml += '<input type="hidden" name="csrf_token" value="' + escapeHtml(window.textmebored.csrfToken || '') + '">';
     modalHtml += '<input type="hidden" name="action" value="send">';
-    modalHtml += '<div class="mb-3" style="position:relative;"><label class="form-label">To (username)</label><input type="text" name="to_username" id="textmebored-username" class="form-control" placeholder="Enter username" required autocomplete="off"><div id="textmebored-user-suggestions" class="position-absolute" style="top:100%;left:0;right:0;background:white;border:1px solid #ccc;max-height:200px;overflow-y:auto;z-index:1100;display:none;"></div></div>';
+    var datalistId = 'textmebored-user-datalist';
+    var datalistHtml = '<datalist id="' + datalistId + '">';
+    if (window.textmebored && window.textmebored.users) {
+        window.textmebored.users.forEach(function (u) {
+            datalistHtml += '<option value="' + escapeHtml(u.username) + '">';
+        });
+    }
+    datalistHtml += '</datalist>';
+    modalHtml += datalistHtml;
+    modalHtml += '<div class="mb-3" style="position:relative;"><label class="form-label">To (username)</label><input type="text" name="to_username" id="textmebored-username" class="form-control" list="' + datalistId + '" placeholder="Enter username" required autocomplete="off"><div id="textmebored-user-suggestions" class="position-absolute" style="top:100%;left:0;right:0;background:white;border:1px solid #ccc;max-height:200px;overflow-y:auto;z-index:1100;display:none;"></div></div>';
     modalHtml += '<div class="mb-3"><label class="form-label">Message</label><input type="text" name="content" class="form-control" placeholder="Type a message..." required autocomplete="off"></div>';
     modalHtml += '<button type="submit" class="btn btn-forum btn-sm"><i class="fas fa-paper-plane me-1"></i>Send</button>';
     modalHtml += '</form>';
@@ -264,6 +273,13 @@ function newConversation() {
 
     modal.innerHTML = modalHtml;
     document.body.appendChild(modal);
+
+    if (prefillUsername) {
+        var prefillInput = modal.querySelector('#textmebored-username');
+        if (prefillInput) {
+            prefillInput.value = prefillUsername;
+        }
+    }
 
     var closeBtn = modal.querySelector('.textmebored-modal-close');
     closeBtn.addEventListener('click', function () {
@@ -513,4 +529,10 @@ function newConversation() {
     window.textmebored.newConversation = newConversation;
     window.textmebored.openConversation = openConversation;
     window.textmebored.init = init;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();

@@ -1,10 +1,9 @@
 <?php
 /**
  * Plugin Name: textmebored
- * Version: 1.0.1
  * Author: mlzog
  * Description: Private messaging and chat system
- * License: MIT License
+ * License: BSD Zero Clause License
  */
 
 function textmebored_init() {
@@ -73,10 +72,10 @@ function textmebored_init() {
     $tmUsersJson = json_encode($tmUsers);
 
     $head = '<link href="' . $cssUrl . '" rel="stylesheet">' . "\n";
-    $nonce = $_SERVER['CSP_NONCE'] ?? '';
+    $nonce = $GLOBALS['CSP_NONCE'] ?? '';
     $head .= '<script nonce="' . htmlspecialchars($nonce, ENT_QUOTES, 'UTF-8') . '">window.textmebored = window.textmebored || {};window.textmebored.apiUrl = ' . json_encode($apiUrl) . ';window.textmebored.baseUrl = ' . json_encode($baseUrl) . ';window.textmebored.csrfToken = ' . json_encode($csrfToken) . ';window.textmebored.currentUserId = ' . json_encode($_SESSION['user_id'] ?? 0) . ';window.textmebored.users = ' . $tmUsersJson . ';</script>' . "\n";
 
-    $footer = '<script src="' . $jsUrl . '"></script>' . "\n";
+    $footer = '<script src="' . $jsUrl . '" nonce="' . htmlspecialchars($nonce, ENT_QUOTES, 'UTF-8') . '"></script>' . "\n";
 
     $pluginManager->addHook('frontend_before_render', function() use ($head) {
         echo $head;
