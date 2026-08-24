@@ -59,11 +59,24 @@ function textmebored_init() {
     $cssUrl = $tmVer('assets/css/textmebored.css');
     $jsUrl = $tmVer('assets/js/textmebored.js');
     $csrfToken = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES);
+    $nonce = function_exists('csp_nonce') ? csp_nonce() : '';
+
+    // User list used to power the recipient autocomplete in the composer
+    // (native datalist + XHR suggestions).
+    $tmUsers = [];
+    if (isset($pdo)) {
+        try {
+            $uStmt = $pdo->query("SELECT id, username FROM users ORDER BY username ASC");
+            $tmUsers = $uStmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {}
+    }
+    $tmUsersJson = json_encode($tmUsers);
 
     $head = '<link href="' . $cssUrl . '" rel="stylesheet">' . "\n";
-    $head .= '<script>window.textmebored = window.textmebored || {};window.textmebored.apiUrl = ' . json_encode($apiUrl) . ';window.textmebored.baseUrl = ' . json_encode($baseUrl) . ';window.textmebored.csrfToken = ' . json_encode($csrfToken) . ';window.textmebored.currentUserId = ' . json_encode($_SESSION['user_id'] ?? 0) . ';</script>' . "\n";
+    $nonce = $_SERVER['CSP_NONCE'] ?? '';
+    $head .= '<script nonce="' . htmlspecialchars($nonce, ENT_QUOTES, 'UTF-8') . '">window.textmebored = window.textmebored || {};window.textmebored.apiUrl = ' . json_encode($apiUrl) . ';window.textmebored.baseUrl = ' . json_encode($baseUrl) . ';window.textmebored.csrfToken = ' . json_encode($csrfToken) . ';window.textmebored.currentUserId = ' . json_encode($_SESSION['user_id'] ?? 0) . ';window.textmebored.users = ' . $tmUsersJson . ';</script>' . "\n";
 
-    $footer = '<script src="' . $jsUrl . '" onload="window.textmebored=window.textmebored||{};window.textmebored.init&&window.textmebored.init()"></script>' . "\n";
+    $footer = '<script src="' . $jsUrl . '"></script>' . "\n";
 
     $pluginManager->addHook('frontend_before_render', function() use ($head) {
         echo $head;

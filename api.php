@@ -1,8 +1,7 @@
 <?php
-// Use the same app-owned session directory as the main app (bootstrap.php),
-// otherwise on shared hosting where the system default session path is not
-// writable the standalone API would start a fresh session every request and
-// fail CSRF validation, breaking messages/autocomplete silently.
+// Load the core bootstrap so we share the same session, config, database
+// connection and mail settings. The bootstrap is designed to be included
+// multiple times safely (it checks session_status() before session_start()).
 $sessionDir = __DIR__ . '/../../data/sessions';
 if (!is_dir($sessionDir)) {
     @mkdir($sessionDir, 0755, true);
@@ -10,8 +9,7 @@ if (!is_dir($sessionDir)) {
 if (is_dir($sessionDir) && is_writable($sessionDir)) {
     session_save_path($sessionDir);
 }
-session_start();
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../src/bootstrap.php';
 require_once __DIR__ . '/../../src/helpers.php';
 
 // Minimal i18n bootstrap so t()/send_email() work in this standalone endpoint.
@@ -37,6 +35,7 @@ header('Content-Type: application/json');
 // Always respond with JSON, even on fatal errors, so the frontend never
 // receives an HTML error page that would break JSON.parse in production.
 set_exception_handler(function ($e) {
+    error_log('textmebored API exception: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     if (!headers_sent()) {
         http_response_code(500);
         header('Content-Type: application/json');
@@ -245,6 +244,16 @@ if ($method === 'POST') {
             VALUES (?, ?, '', ?)
         ");
         $stmt->execute([$_SESSION['user_id'], $recipientId, $content]);
+        $messageId = $pdo->lastInsertId();
+
+        // In-app notification for the recipient (textmebored owns this). The
+        // email is sent just below.
+        $senderStmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+        $senderStmt->execute([$_SESSION['user_id']]);
+        $senderName = $senderStmt->fetchColumn() ?: 'Someone';
+        $pmLink = url('messages', ['conversation' => (int)$_SESSION['user_id']], true);
+        $notifMsg = t('pm_notification', ['sender' => escape($senderName)]);
+        create_notification($pdo, (int)$recipientId, 'pm', $notifMsg, $notifMsg, $pmLink);
 
         // Notify the recipient by email (case 8).
         $senderStmt = $pdo->prepare("SELECT username, email FROM users WHERE id = ?");
@@ -261,7 +270,11 @@ if ($method === 'POST') {
                 'message' => escape(mb_substr($content, 0, 500)),
                 'link' => url('messages', ['conversation' => $recipientId], true),
             ]);
-            send_email($recipient['email'], $subject, $body);
+            try {
+                send_email($recipient['email'], $subject, $body);
+            } catch (Throwable $e) {
+                error_log('textmebored: email notification failed: ' . $e->getMessage());
+            }
         }
 
         echo json_encode([
