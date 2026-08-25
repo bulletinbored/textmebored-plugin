@@ -408,11 +408,8 @@
         if (window.textmebored.currentUserId === 0) {
             return;
         }
-        // On mobile the envelope is a plain link to the messages page (the
-        // numbered badge stays). Dropdowns are disabled there.
-        if (window.matchMedia && window.matchMedia('(max-width: 991.98px)').matches) {
-            return;
-        }
+        // Dropdowns are now enabled on every breakpoint (incl. mobile), matching
+        // the in-app behavior the user expects.
 
         if (document.getElementById('textmebored-nav-anchor')) {
             return;
