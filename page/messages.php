@@ -1,4 +1,4 @@
-<?php include __DIR__.'/../../views/header.php'; render_header('Messages'); ?>
+<?php include __DIR__.'/../../../views/header.php'; render_header('Messages'); ?>
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= url('home') ?>"><?= t('all_discussions') ?></a></li>
