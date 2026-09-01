@@ -251,7 +251,13 @@ if ($method === 'POST') {
         $senderStmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
         $senderStmt->execute([$_SESSION['user_id']]);
         $senderName = $senderStmt->fetchColumn() ?: 'Someone';
-        $baseUrl = rtrim(base_url(), '/');
+        $cfg = App::getInstance()->config;
+        $baseUrl = rtrim($cfg['base_url'] ?? '', '/');
+        if (empty($baseUrl)) {
+            // Fallback: derive from request, stripping plugin path
+            $baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            $baseUrl = preg_replace('#/plugins/[^/]+.*$#', '', $baseUrl);
+        }
         $pmLink = $baseUrl . '/messages?conversation=' . (int)$_SESSION['user_id'];
         $notifMsg = t('pm_notification', ['sender' => escape($senderName)]);
         create_notification($pdo, (int)$recipientId, 'pm', $notifMsg, $notifMsg, $pmLink);

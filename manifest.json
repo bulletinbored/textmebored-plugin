@@ -1,6 +1,6 @@
 {
     "name": "textmebored",
-    "version": "1.0.13",
+    "version": "1.0.14",
     "author": "mlzog",
     "description": "Private messaging and chat system",
     "bootstrap": "textmebored.php"
