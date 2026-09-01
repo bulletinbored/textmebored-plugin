@@ -251,7 +251,8 @@ if ($method === 'POST') {
         $senderStmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
         $senderStmt->execute([$_SESSION['user_id']]);
         $senderName = $senderStmt->fetchColumn() ?: 'Someone';
-        $pmLink = url('messages', ['conversation' => (int)$_SESSION['user_id']], true);
+        $baseUrl = rtrim(base_url(), '/');
+        $pmLink = $baseUrl . '/messages?conversation=' . (int)$_SESSION['user_id'];
         $notifMsg = t('pm_notification', ['sender' => escape($senderName)]);
         create_notification($pdo, (int)$recipientId, 'pm', $notifMsg, $notifMsg, $pmLink);
 
@@ -268,7 +269,7 @@ if ($method === 'POST') {
                 'username' => escape($recipient['username'] ?? ''),
                 'sender' => escape($sender['username'] ?? 'Someone'),
                 'message' => escape(mb_substr($content, 0, 500)),
-                'link' => url('messages', ['conversation' => $recipientId], true),
+                'link' => $baseUrl . '/messages?conversation=' . $recipientId,
             ]);
             try {
                 send_email($recipient['email'], $subject, $body);

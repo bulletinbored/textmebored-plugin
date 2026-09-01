@@ -7,7 +7,9 @@
  */
 
 function textmebored_init() {
-    global $pluginManager, $config, $pdo;
+    $pluginManager = App::getInstance()->pluginManager;
+    $config = App::getInstance()->config;
+    $pdo = App::getInstance()->pdo;
 
     if (!isset($pluginManager)) {
         return;
@@ -72,7 +74,7 @@ function textmebored_init() {
     $tmUsersJson = json_encode($tmUsers);
 
     $head = '<link href="' . $cssUrl . '" rel="stylesheet">' . "\n";
-    $nonce = $GLOBALS['CSP_NONCE'] ?? '';
+    $nonce = App::getInstance()->cspNonce ?? '';
     $head .= '<script nonce="' . htmlspecialchars($nonce, ENT_QUOTES, 'UTF-8') . '">window.textmebored = window.textmebored || {};window.textmebored.apiUrl = ' . json_encode($apiUrl) . ';window.textmebored.baseUrl = ' . json_encode($baseUrl) . ';window.textmebored.csrfToken = ' . json_encode($csrfToken) . ';window.textmebored.currentUserId = ' . json_encode($_SESSION['user_id'] ?? 0) . ';window.textmebored.users = ' . $tmUsersJson . ';</script>' . "\n";
 
     $footer = '<script src="' . $jsUrl . '" nonce="' . htmlspecialchars($nonce, ENT_QUOTES, 'UTF-8') . '"></script>' . "\n";

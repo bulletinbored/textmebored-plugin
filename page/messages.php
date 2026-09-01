@@ -1,9 +1,12 @@
-<?php include __DIR__.'/../../../views/header.php'; render_header('Messages'); ?>
+<?php
+include __DIR__.'/../../../views/header.php';
+$baseUrl = rtrim(base_url(), '/');
+render_header('Messages'); ?>
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= url('home') ?>"><?= t('all_discussions') ?></a></li>
             <?php if (!empty($messages ?? null)): ?>
-                <li class="breadcrumb-item"><a href="<?= url('messages') ?>"><?= t('messages') ?></a></li>
+                <li class="breadcrumb-item"><a href="<?= $baseUrl ?>/messages"><?= t('messages') ?></a></li>
                 <li class="breadcrumb-item active"><?= escape($otherUsername ?? 'Conversation') ?></li>
             <?php else: ?>
                 <li class="breadcrumb-item active"><?= t('messages') ?></li>
@@ -15,7 +18,7 @@
 
     <?php if (!empty($messages ?? null)): ?>
         <?php if (!empty($otherUsername ?? '')): ?>
-            <a href="<?= url('messages') ?>" class="btn btn-sm btn-outline-secondary mb-3"><i class="fas fa-arrow-left me-1"></i>Back to conversations</a>
+            <a href="<?= $baseUrl ?>/messages" class="btn btn-sm btn-outline-secondary mb-3"><i class="fas fa-arrow-left me-1"></i>Back to conversations</a>
         <?php endif; ?>
 
         <?php
@@ -65,7 +68,7 @@
                 <?php endforeach; ?>
             </div>
         </div>
-        <form method="POST" action="<?= url('messages', ['conversation' => $messages[0]['sender_id'] ?? 0]) ?>" class="card">
+        <form method="POST" action="<?= $baseUrl ?>/messages?conversation=<?= $messages[0]['sender_id'] ?? 0 ?>" class="card">
             <div class="card-body">
                 <div class="input-group">
                     <input type="hidden" name="csrf_token" value="<?= generate_csrf_token() ?>">
@@ -80,7 +83,7 @@
                 $cDate = $c['last_message_at'] ?? '';
                 $cFormattedDate = $cDate ? date('M j, Y H:i', strtotime($cDate)) : '';
             ?>
-                <a href="<?= url('messages', ['conversation' => $c['other_user_id']]) ?>" class="list-group-item list-group-item-action <?= ($c['unread_count'] ?? 0) > 0 ? 'list-group-item-warning' : '' ?>">
+                <a href="<?= $baseUrl ?>/messages?conversation=<?= $c['other_user_id'] ?>" class="list-group-item list-group-item-action <?= ($c['unread_count'] ?? 0) > 0 ? 'list-group-item-warning' : '' ?>">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <h6 class="mb-1"><?= escape($c['other_username'] ?? 'Unknown') ?></h6>
