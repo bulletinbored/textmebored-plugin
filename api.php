@@ -12,23 +12,9 @@ if (is_dir($sessionDir) && is_writable($sessionDir)) {
 require_once __DIR__ . '/../../src/bootstrap.php';
 require_once __DIR__ . '/../../src/helpers.php';
 
-// Minimal i18n bootstrap so t()/send_email() work in this standalone endpoint.
-$lang = $_SESSION['lang'] ?? $config['default_lang'] ?? 'en';
-$GLOBALS['i18n'] = ['core' => []];
-$coreLangFile = __DIR__ . '/../../lang/' . $lang . '.php';
-if (file_exists($coreLangFile)) {
-    $GLOBALS['i18n']['core'] = include $coreLangFile;
-}
-if (!function_exists('t')) {
-    function t($key, $params = [], $scope = 'core') {
-        $registry = $GLOBALS['i18n'] ?? [];
-        $text = $registry[$scope][$key] ?? $key;
-        foreach ($params as $k => $v) {
-            $text = str_replace('{' . $k . '}', $v, $text);
-        }
-        return $text;
-    }
-}
+// bootstrap.php has already loaded the core translation scope and defined t(),
+// so no separate i18n bootstrap is needed here. Translation files are JSON-only
+// and are never included as PHP.
 
 header('Content-Type: application/json');
 
@@ -40,7 +26,7 @@ set_exception_handler(function ($e) {
         http_response_code(500);
         header('Content-Type: application/json');
     }
-    echo json_encode(['error' => 'Internal error: ' . $e->getMessage()]);
+    echo json_encode(['error' => 'internal_error']);
     exit;
 });
 
@@ -324,7 +310,9 @@ if ($method === 'POST') {
             exit;
         }
 
-        $stmt = $pdo->prepare("SELECT id, username FROM users WHERE username LIKE ? AND id <> ? LIMIT 10");
+        // Escape LIKE wildcards so a query like "%" cannot enumerate all users.
+        $query = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query);
+        $stmt = $pdo->prepare("SELECT id, username FROM users WHERE username LIKE ? ESCAPE '\\' AND id <> ? LIMIT 10");
         $stmt->execute(["{$query}%", $_SESSION['user_id']]);
         $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
