@@ -401,7 +401,7 @@
     }
 
     function openConversation(userId, username) {
-        fetchMessages(userId);
+        window.location.href = window.textmebored.baseUrl + '/messages?conversation=' + encodeURIComponent(userId);
     }
 
     function createUI() {
