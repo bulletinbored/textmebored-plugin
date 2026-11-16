@@ -22,17 +22,16 @@ render_header('Messages'); ?>
         <?php endif; ?>
 
         <?php
-        $otherId = 0;
+        $otherId = (int)($conversationUserId ?? 0);
         $otherAvatar = '';
         if (!empty($messages)) {
-            foreach ($messages as $m) {
-                if (($m['sender_id'] ?? 0) != ($_SESSION['user_id'] ?? 0)) {
-                    $otherId = (int)($m['sender_id'] ?? 0);
-                    break;
+            if (!$otherId) {
+                foreach ($messages as $m) {
+                    if (($m['sender_id'] ?? 0) != ($_SESSION['user_id'] ?? 0)) {
+                        $otherId = (int)($m['sender_id'] ?? 0);
+                        break;
+                    }
                 }
-            }
-            if (!$otherId && !empty($messages[0])) {
-                $otherId = (int)($messages[0]['sender_id'] ?? 0);
             }
             if ($otherId && !empty($GLOBALS['pdo'])) {
                 try {
@@ -68,7 +67,7 @@ render_header('Messages'); ?>
                 <?php endforeach; ?>
             </div>
         </div>
-        <form method="POST" action="<?= $baseUrl ?>/messages?conversation=<?= $messages[0]['sender_id'] ?? 0 ?>" class="card">
+        <form method="POST" action="<?= $baseUrl ?>/messages?conversation=<?= (int)$conversationUserId ?>" class="card">
             <div class="card-body">
                 <div class="input-group">
                     <input type="hidden" name="csrf_token" value="<?= generate_csrf_token() ?>">

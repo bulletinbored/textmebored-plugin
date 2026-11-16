@@ -133,6 +133,9 @@ function textmebored_handle_page(string $method): void
     if ($method === 'POST' && isset($_POST['content']) && csrf_validate_request()) {
         $recipientId = (int)($_GET['conversation'] ?? 0);
         $content = trim($_POST['content'] ?? '');
+        if ($recipientId === (int)($_SESSION['user_id'] ?? 0)) {
+            $recipientId = 0;
+        }
         if ($recipientId > 0 && $content !== '') {
             $stmt = $pdo->prepare("INSERT INTO private_messages (sender_id, recipient_id, subject, content) VALUES (?, ?, '', ?)");
             $stmt->execute([$_SESSION['user_id'], $recipientId, $content]);
