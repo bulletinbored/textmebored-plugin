@@ -414,9 +414,12 @@
         if (document.getElementById('textmebored-nav-anchor')) {
             return;
         }
-        // Reuse the existing Messages icon in the topbar (rendered by header.php)
-        // instead of injecting a duplicate envelope icon after the user menu.
-        toggle = document.querySelector('a[href*="messages"][title="Messages"]');
+        // Reuse the existing Messages icon in the topbar (rendered by the
+        // plugin's navbar_icons hook) instead of injecting a duplicate
+        // envelope icon after the user menu. Match on data/href rather than
+        // the translated title, which changes with the active language.
+        toggle = document.querySelector('.topbar-user a[data-mobile-tab="messages"]')
+            || document.querySelector('.topbar-user a[href*="/messages"]');
         if (!toggle) {
             var userMenu = document.querySelector('.navbar-nav:last-child');
             if (!userMenu) return;
