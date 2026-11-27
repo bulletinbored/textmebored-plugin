@@ -19,6 +19,11 @@ function textmebored_init() {
     $pluginUrl = $baseUrl . '/plugins/textmebored';
     $apiUrl = $pluginUrl . '/api.php';
 
+    // Preserve the original menu order in forum mode; only the full social
+    // mode puts Messages before Notifications.
+    $socialboredMode = strtolower((string)$pluginManager->getSetting('socialbored', 'mode', 'forum'));
+    $navPriority = $socialboredMode === 'social' ? 20 : 10;
+
     $driver = $config['db_driver'] ?? 'sqlite';
 
     if (isset($pdo)) {
@@ -95,7 +100,7 @@ function textmebored_init() {
         echo '<i class="fas fa-envelope"></i>';
         echo '</a>';
         echo '</li>';
-    });
+    }, $navPriority);
 
     $pluginManager->addHook('mobile_tabbar_icons', function() {
         $baseUrl = rtrim(base_url(), '/');
@@ -103,12 +108,12 @@ function textmebored_init() {
         echo '<a href="' . $baseUrl . '/messages" class="mobile-tab" data-mobile-tab="messages" title="' . $safeTitle . '">';
         echo '<i class="fas fa-envelope"></i>';
         echo '</a>';
-    });
+    }, $navPriority);
 
     $pluginManager->addHook('mobile_stack_tabs', function() {
         $isActive = !isset($_SESSION['user_id']) ? '' : '';
         echo '<button type="button" class="mobile-stack-tab' . $isActive . '" data-tab="messages" role="tab"><i class="fas fa-envelope"></i></button>';
-    });
+    }, $navPriority);
 
     $pluginManager->addHook('mobile_stack_panes', function() {
         echo '<div class="mobile-stack-pane" data-pane="messages" id="paneMessages"><div class="mobile-stack-loading">Loading…</div></div>';
